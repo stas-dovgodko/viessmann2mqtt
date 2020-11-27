@@ -1,0 +1,14 @@
+version: '2'
+services:
+  pooler:
+    image: php:7
+    volumes:
+      - .:/app
+
+  composer:
+    restart: 'no'
+    image: composer
+    command: composer update
+    volumes:
+      - .:/app
+

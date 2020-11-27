@@ -1,0 +1,19 @@
+{
+  "alias": "pooler.phar",
+  "chmod": "0755",
+  "directories": ["src"],
+  "files": [
+    "LICENSE"
+  ],
+  "finder": [
+    {
+      "name": "*.php",
+      "exclude": ["Tests", "justinrainbow/json-schema", "kherge", "phine/", "seld/", "symfony/console", "symfony/debug", "symfony/finder", "symfony/process", "tedivm/jshrink", "Examples", "tests"],
+      "in": "vendor"
+    }
+  ],
+  "git-version": "package_version",
+  "main": "pooler.php",
+  "output": "pooler.phar",
+  "stub": true
+}
