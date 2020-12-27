@@ -3,6 +3,11 @@ session_start(); // viesmann api related
 use PhpMqtt\Client\MQTTClient;
 use Viessmann\API\ViessmannAPI;
 
+$error = function($message) {
+    echo $message;
+    error_log($message);
+};
+
 try {
     $dotenv = Dotenv\Dotenv::createImmutable(getcwd());
     $dotenv->load();
@@ -29,12 +34,6 @@ try {
         }
         return $mqttClient->publish($topic, \json_encode($data), $qos);
     };
-
-    $error = function($message) {
-        echo $message;
-        error_log($message);
-    };
-
 
     $viessmannApi = new ViessmannAPI([
         "user" => trim(getenv('VIESSMANN_USERNAME')),
