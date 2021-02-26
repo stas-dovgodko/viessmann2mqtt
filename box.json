@@ -1,14 +1,14 @@
 {
   "alias": "pooler.phar",
   "chmod": "0755",
-  "directories": ["src"],
+  "directories": ["src", "dist"],
   "files": [
     "LICENSE"
   ],
   "finder": [
     {
       "name": "*.php",
-      "exclude": ["Tests", "justinrainbow/json-schema", "kherge", "phine/", "seld/", "symfony/console", "symfony/debug", "symfony/finder", "symfony/process", "tedivm/jshrink", "Examples", "tests"],
+      "exclude": ["Tests", "justinrainbow/json-schema", "kherge", "phine/", "seld/", "symfony/console", "symfony/debug", "symfony/finder", "symfony/process", "phpdocumentor", "tedivm/jshrink", "Examples", "tests"],
       "in": "vendor"
     }
   ],

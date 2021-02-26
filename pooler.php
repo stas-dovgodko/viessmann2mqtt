@@ -1,6 +1,7 @@
 <?php require __DIR__ . '/vendor/autoload.php';
 session_start(); // viesmann api related
-use PhpMqtt\Client\MQTTClient;
+use PhpMqtt\Client\MqttClient;
+use PhpMqtt\Client\ConnectionSettings;
 use Viessmann\API\ViessmannAPI;
 
 $error = function($message) {
@@ -12,14 +13,24 @@ try {
     $dotenv = Dotenv\Dotenv::createImmutable(getcwd());
     $dotenv->load();
 
-    $mqttClient = new MQTTClient(getenv('MQTT_HOST') ?: '127.0.0.1', getenv('MQTT_PORT') ?: 1883, getenv('MQTT_CLIENT_ID') ?: 'viessmannpooler');
+    $mqttClient = new MqttClient(getenv('MQTT_HOST') ?: '127.0.0.1', getenv('MQTT_PORT') ?: 1883, getenv('MQTT_CLIENT_ID') ?: 'viessmannpooler');
 
     $username = getenv('MQTT_USERNAME');
     $password = getenv('MQTT_PASSWORD');
 
-    $mqttClient->connect($username, $password);
+    if ($username || $password) {
+        $settings = (new ConnectionSettings())
+            ->setUsername($username)
+            ->setPassword($password);
+    } else {
+        $settings = null;
+    }
 
     $is_help = in_array(@$argv[1], ['h', '-h', 'help', '--h', '-help', '--help']);
+
+    if (!$is_help) {
+        $mqttClient->connect($settings);
+    }
 
     $qos = getenv('MQTT_QOS') ?: MQTTClient::QOS_AT_MOST_ONCE;
     $seconds = getenv('POOL_SECONDS') ?: 60;
@@ -82,6 +93,8 @@ try {
                 }
             }
         } else {
+
+
             $mqttClient->registerLoopEventHandler(function (MQTTClient $mqttClient, $elapsedTime) use ($seconds) {
                 if ($elapsedTime >= $seconds) $mqttClient->interrupt();
                 else echo '.';
@@ -102,6 +115,7 @@ try {
             });
 
             $mqttClient->loop(true, true, $seconds);
+
         }
     }
 } catch (\Exception $e) {
