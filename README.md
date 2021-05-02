@@ -36,3 +36,18 @@ Check `viessmann/feature/#` to get|put data
 ```
 php pooler.phar -h
 ```
+
+## CLI Mode
+
+Set data to API via CLI
+
+```
+php pooler.php set heating.circuits.0.temperature.levels@setMax '{"temperature":25}'
+```
+
+Get data from API via CLI
+
+```
+php pooler.php get heating.circuits.0.temperature.levels@getMax
+> 45
+```

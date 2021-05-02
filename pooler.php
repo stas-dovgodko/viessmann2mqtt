@@ -27,25 +27,29 @@ try {
     }
 
     $is_help = in_array(@$argv[1], ['h', '-h', 'help', '--h', '-help', '--help']);
+    $is_get = in_array(@$argv[1], ['get']);
+    $is_set = in_array(@$argv[1], ['set']);
 
-    if (!$is_help) {
+    $is_mqtt = !($is_help || $is_set || $is_get);
+
+    if ($is_mqtt) {
         $mqttClient->connect($settings);
     }
 
     $qos = getenv('MQTT_QOS') ?: MQTTClient::QOS_AT_MOST_ONCE;
     $seconds = getenv('POOL_SECONDS') ?: 60;
 
-    $publish = function ($topic, $data) use ($mqttClient, $qos, $is_help) {
+    $publish = function ($topic, $data) use ($mqttClient, $qos, $is_help, $is_mqtt) {
         /** @var $mqttClient MqttClient */
 
         $topic = 'viessmann/' . $topic;
         if ($is_help) {
             echo '-> '.$topic.'='.json_encode($data)."\n";
             return;
-        }
-        return $mqttClient->publish($topic, \json_encode($data), $qos);
+        } elseif ($is_mqtt) return $mqttClient->publish($topic, \json_encode($data), $qos);
     };
 
+    error_reporting(E_USER_ERROR);
     $viessmannApi = new ViessmannAPI([
         "user" => trim(getenv('VIESSMANN_USERNAME')),
         "pwd" => trim(getenv('VIESSMANN_PASSWORD'))
@@ -57,6 +61,7 @@ try {
 
     $methods = [];
 
+    $flat_properties = [];
     foreach($features as $property) {
         $data = json_decode($viessmannApi->getRawJsonData($property), true);
 
@@ -64,6 +69,7 @@ try {
         if (array_key_exists('properties', $data)) foreach (@$data['properties'] as $n => $info)
         {
             $map[$n] = $info['value'];
+            $flat_properties[$property.'@'.$n] = $info['value'];
         }
         if ($map) $publish('feature/'.$property, $map);
 
@@ -91,6 +97,22 @@ try {
                     echo '('.json_encode($method_args).')';
                     echo "\n";
                 }
+            }
+        } elseif ($is_get) {
+            $key = @$argv[2];
+            if (array_key_exists($key, $flat_properties)) {
+                echo json_encode($flat_properties[$key]);
+            } else {
+                $error('Unsupported feature - '.$key);
+            }
+        } elseif ($is_set) {
+            $key = @$argv[2]; $message = @$argv[3];
+            list($property, $method_name) = explode('@', $key);
+
+            if (isset($methods[$property][$method_name])) {
+                $viessmannApi->setRawJsonData($property, $method_name, $message);
+            } else {
+                $error('Unsupported feature - '.$property.'#'.$method_name);
             }
         } else {
 
