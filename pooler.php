@@ -3,6 +3,7 @@ session_start(); // viesmann api related
 use PhpMqtt\Client\MqttClient;
 use PhpMqtt\Client\ConnectionSettings;
 use Viessmann\API\ViessmannAPI;
+use Viessmann\API\ViessmannFeature;
 
 $error = function($message) {
     echo $message;
@@ -27,6 +28,7 @@ try {
     }
 
     $is_help = in_array(@$argv[1], ['h', '-h', 'help', '--h', '-help', '--help']);
+
     $is_get = in_array(@$argv[1], ['get']);
     $is_set = in_array(@$argv[1], ['set']);
 
@@ -49,43 +51,56 @@ try {
         } elseif ($is_mqtt) return $mqttClient->publish($topic, \json_encode($data), $qos);
     };
 
-    error_reporting(E_USER_ERROR);
+    error_reporting(E_ERROR); ini_set("display_errors", 1);
     $viessmannApi = new ViessmannAPI([
         "user" => trim(getenv('VIESSMANN_USERNAME')),
-        "pwd" => trim(getenv('VIESSMANN_PASSWORD'))
-    ]);
+        "pwd" => trim(getenv('VIESSMANN_PASSWORD')),
+        "clientId" => trim(getenv('VIESSMANN_CLIENTID')),
+    ], true);
 
-    $features = array_map('trim', explode(',', $viessmannApi->getAvailableFeatures()));
 
-    $publish('features', $features);
-
-    $methods = [];
-
-    $flat_properties = [];
-    foreach($features as $property) {
-        $data = json_decode($viessmannApi->getRawJsonData($property), true);
+    $devices = [];
+    foreach(@json_decode($viessmannApi->getGatewayFeatures(), true)['data'] as $item) {
 
         $map = [];
-        if (array_key_exists('properties', $data)) foreach (@$data['properties'] as $n => $info)
-        {
-            $map[$n] = $info['value'];
-            $flat_properties[$property.'@'.$n] = $info['value'];
+        if($item['properties']) foreach($item['properties'] as $property_name => $property_data) {
+            $map[$property_name] = $property_data['value'];
+
         }
-        if ($map) $publish('feature/'.$property, $map);
+        if (!$item['components']) $publish('gateway/'.$item['feature'], $map);
 
+        if ($item['feature'] === 'gateway.devices') {
+            foreach($map['devices'] as $device_info) $devices[] = $device_info['id'];
+        }
+    }
 
-        if (array_key_exists('actions', $data)) {
-            $methods[$property] = [];
+    $methods = [
 
-            foreach(@$data['actions'] as $info) {
+    ];
 
-                $methods[$property][$info['name']] = [];
-                //echo '  @'.$info['name']."(";
-                foreach ((array)@$info['fields'] as $info2) {
-                    $methods[$property][$info['name']][$info2['name']] = $info2['type'];
+    $flat_properties = [];
+    foreach ($devices as $deviceId) {
+        foreach(@json_decode($viessmannApi->getDeviceFeatures($deviceId), true)['data'] as $item) {
+            $map = [];
+            $method = $deviceId.'/'.$item['feature'];
+            if($item['properties']) foreach($item['properties'] as $property_name => $property_data) {
+                $map[$property_name] = $property_data['value'];
+                $flat_properties[$method.'@'.$property_name] = $property_data['value'];
+            }
+
+            if (!$item['components']) $publish($method, $map);
+
+            $methods[$method] = [];
+
+            if ($item['commands']) foreach($item['commands'] as $command_name => $command) {
+
+                $methods[$method][$command_name] = [];
+                foreach ((array)$command['params'] as $field_name => $field) {
+                    $methods[$method][$command_name][$field_name] = $field['type'];
                 }
             }
         }
+
     }
 
     if ($methods) {
@@ -93,7 +108,7 @@ try {
             $i=0;
             foreach ($methods as $property => $property_methods) {
                 foreach ($property_methods as $method_name => $method_args) {
-                    echo '<- viessmann/feature/'.$property.'/'.$method_name;
+                    echo '<- viessmann/'.$property.'@'.$method_name;
                     echo '('.json_encode($method_args).')';
                     echo "\n";
                 }
@@ -108,9 +123,10 @@ try {
         } elseif ($is_set) {
             $key = @$argv[2]; $message = @$argv[3];
             list($property, $method_name) = explode('@', $key);
+            list($device, $feature) = explode('/', $property);
 
             if (isset($methods[$property][$method_name])) {
-                $viessmannApi->setRawJsonData($property, $method_name, $message);
+                $viessmannApi->commandDeviceFeature($device, $feature, $method_name, $message);
             } else {
                 $error('Unsupported feature - '.$property.'#'.$method_name);
             }
@@ -121,12 +137,13 @@ try {
                 if ($elapsedTime >= $seconds) $mqttClient->interrupt();
                 else echo '.';
             });
-            $mqttClient->subscribe('viessmann/feature/+/+', function ($topic, $message) use ($viessmannApi, $methods, $error) {
-                if (($pos = strpos($topic, $pref = 'viessmann/feature/')) !== false) {
-                    list($property, $method) = explode('/', substr($topic, $pos + strlen($pref)));
+            $mqttClient->subscribe('viessmann/+/+/+', function ($topic, $message) use ($viessmannApi, $methods, $error) {
+                if (($pos = strpos($topic, $pref = 'viessmann/')) !== false) {
+                    list($device, $feature, $method) = explode('/', substr($topic, $pos + strlen($pref)));
 
+                    $property = $device.'/'.$feature;
                     if (isset($methods[$property][$method])) {
-                        $viessmannApi->setRawJsonData($property, $method, $message);
+                        $viessmannApi->commandDeviceFeature($device, $feature, $method, $message);
                         echo $property.'@'.$method . ': ' . $message . PHP_EOL;
                     } else {
                         $error('Unsupported feature - '.$property.'#'.$method);

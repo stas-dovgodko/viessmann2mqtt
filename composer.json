@@ -37,7 +37,10 @@
     "ext-json": "*",
     "ext-curl": "*",
     "thetrueavatar/viessmann-api": "dev-master",
-    "php-mqtt/client": "dev-master"
+    "php-mqtt/client": "dev-master",
+
+    "lusitanian/oauth": "0.3",
+    "tomphp/siren": "9999999-dev"
   },
   "require-dev": {
     "kherge/box": "~2.7",

@@ -42,12 +42,12 @@ php pooler.phar -h
 Set data to API via CLI
 
 ```
-php pooler.php set heating.circuits.0.temperature.levels@setMax '{"temperature":25}'
+php pooler.php set 0/heating.circuits.0.temperature.levels@setMax '{"temperature":25}'
 ```
 
 Get data from API via CLI
 
 ```
-php pooler.php get heating.circuits.0.temperature.levels@getMax
+php pooler.php get 0/heating.circuits.0.temperature.levels@max
 > 45
 ```
